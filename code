@@ -1,0 +1,83 @@
+import numpy as np
+from sklearn import svm
+import serial
+import time
+
+# Define the serial port for the TCU
+tcu_port = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
+
+# Define the phone numbers and web application URL
+phone_number1 = "+1234567890"
+phone_number2 = "+9876543210"
+web_app_url = "https://example.com/alert"
+
+# Define the nearby police station and ambulance details
+police_station_number = "+1111111111"
+ambulance_number = "+2222222222"
+
+# Sample data (replace with actual data from fibre Bragg gratings)
+temperature_data = np.array([20, 30, 40, 50, 60, 70, 80, 90, 100])
+stress_data = np.array([100, 200, 300, 400, 500, 600, 700, 800, 900])
+strain_data = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+
+# Define the impact levels (replace with actual impact levels)
+impact_levels = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
+
+# Combine the data into a single array
+data = np.column_stack((temperature_data, stress_data, strain_data))
+
+# Create an SVM classifier
+classifier = svm.SVC(kernel='linear')
+
+# Train the classifier
+classifier.fit(data, impact_levels)
+
+# Define the threshold values
+threshold1 = 0.5
+threshold2 = 1.5
+
+# Function to classify the impact and send alerts
+def classify_impact(temperature, stress, strain):
+    # Create a data point
+    data_point = np.array([[temperature, stress, strain]])
+
+    # Classify the data point
+    impact_level = classifier.predict(data_point)
+
+    # Send alerts based on the impact level
+    if impact_level < threshold1:
+        print("No alert")
+    elif impact_level < threshold2:
+        print("Alert: Informing 2 phone numbers/web application")
+        send_alert(phone_number1, phone_number2, web_app_url)
+    else:
+        print("Alert: Informing nearby police station, 2 phone numbers, and ambulance")
+        send_alert(phone_number1, phone_number2, web_app_url)
+        send_alert(police_station_number, ambulance_number)
+
+# Function to send alerts using the TCU
+def send_alert(phone_number1, phone_number2, url=None):
+    # Send SMS to phone numbers
+    tcu_port.write(b"AT+CMGS=\"" + phone_number1.encode() + b"\"\r")
+    time.sleep(0.5)
+    tcu_port.write(b"Alert: Impact detected!\r")
+    time.sleep(0.5)
+    tcu_port.write(b"\x1A\r")
+    time.sleep(1)
+
+    tcu_port.write(b"AT+CMGS=\"" + phone_number2.encode() + b"\"\r")
+    time.sleep(0.5)
+    tcu_port.write(b"Alert: Impact detected!\r")
+    time.sleep(0.5)
+    tcu_port.write(b"\x1A\r")
+    time.sleep(1)
+
+    # Send data to web application if URL is provided
+    if url:
+        tcu_port.write(b"AT+HTTPPOST=\"" + url.encode() + b"\"\r")
+        time.sleep(1)
+        tcu_port.write(b"Alert: Impact detected!\r")
+        time.sleep(1)
+
+# Test the function
+classify_impact(50, 400, 0.4)
